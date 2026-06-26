@@ -1,0 +1,14 @@
+#####HOla fer, pon tu correo para que hagas la prueba
+<?php
+$config_smtp_user = "TU_CORREO_AQUI";
+$config_smtp_pass = "TU_CONTRASEÑA_AQUI";
+?>
+#######como usas windows ejecuta esto en tu terminal 
+git config --global core.autocrlf true
+###Recuerdad que te dije de mailhog? ???? pues ese para ti
+#######pasos para mailhog para ti, feliz cumple 
+descargalo  si usas xa,pp. descarga el exe y después configura php.ini así: 
+[mail function]
+SMTP = localhost
+smtp_port = 1025
+sendmail_path = "C:\ruta\a\mailhog\MailHog_windows_amd64.exe sendmail"

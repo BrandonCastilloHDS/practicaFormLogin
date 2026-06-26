@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio de sesión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        .primary-bg { background-color: #104385; }
+        .primary-text { color: #104385; }
+        .secondary-text { color: #0CDBEB; }
+        
+        .input-error {
+            border-color: #ef4444 !important;
+        }
+        
+        .focus-ring:focus {
+            outline: none;
+            border-color: #0CDBEB;
+            box-shadow: 0 0 0 3px rgba(12, 219, 235, 0.2);
+        }
+        
+        .transition-all { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-slate-100">
+        <div class="flex justify-center mb-6">
+            <div class="p-3 bg-slate-50 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 primary-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+        </div>
+
+        <h1 class="text-2xl font-bold text-center text-slate-800 mb-2">¡Bienvenid@!</h1>
+        <p class="text-slate-500 text-center mb-8 text-sm">Ingresa tus datos para acceder</p>
+
+            <form id="loginForm" class="space-y-4" novalidate>
+                <div class="relative">
+                <label for="email" class="block text-sm font-medium text-slate-700 mb-1">Correo electrónico</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    class="w-full px-4 py-3 rounded-lg border border-slate-200 focus-ring transition-all text-slate-800"
+                    placeholder="nombre@ejemplo.com"
+                >
+                <p id="emailError" class="hidden text-red-500 text-xs mt-1 font-medium">No has ingresado tu correo</p>
+            </div>
+
+            <div class="relative">
+                <div class="flex justify-between mb-1">
+                    <label for="password" class="block text-sm font-medium text-slate-700">Contraseña</label>
+                    <a href="cambiarPassword.html" class="text-xs font-semibold secondary-text hover:underline">¿Olvidaste tu contraseña?</a>
+                </div>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="pass" 
+                    class="w-full px-4 py-3 rounded-lg border border-slate-200 focus-ring transition-all text-slate-800"
+                    placeholder="••••••••"
+                >
+                <p id="passwordError" class="hidden text-red-500 text-xs mt-1 font-medium">No has ingresado tu contraseña</p>
+            </div>
+
+            <button 
+                type="submit" 
+                id="loginBtn" 
+                class="w-full primary-bg text-white py-3 mt-4 rounded-lg font-semibold shadow-lg transition-all hover:brightness-110 active:scale-[0.98]"
+            >
+                Ingresar
+            </button>
+        </form>
+
+        <div class="mt-8 pt-6 border-t border-slate-100 text-center">
+            <p class="text-sm text-slate-600">
+                ¿No tienes una cuenta? 
+                <a href="registerForm.html" class="font-semibold secondary-text hover:underline">Registrarme</a>
+            </p>
+        </div>
+
+        <div id="statusMessage" class="hidden mt-4 p-3 rounded-lg text-sm text-center"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginForm = document.getElementById('loginForm');
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            const emailError = document.getElementById('emailError');
+            const passwordError = document.getElementById('passwordError');
+            const statusMessage = document.getElementById('statusMessage');
+            const loginBtn = document.getElementById('loginBtn');
+
+            const clearErrors = () => {
+                emailInput.classList.remove('input-error');
+                passwordInput.classList.remove('input-error');
+                emailError.classList.add('hidden');
+                passwordError.classList.add('hidden');
+                statusMessage.classList.add('hidden');
+            };
+            loginForm.addEventListener('submit', async (e) => { // Nota: le agregamos 'async'
+                e.preventDefault();
+                clearErrors();
+
+                const isEmailEmpty = emailInput.value.trim() === '';
+                const isPasswordEmpty = passwordInput.value.trim() === '';
+                
+                let hasErrors = false;
+
+                if (isEmailEmpty) {
+                    emailInput.classList.add('input-error');
+                    emailError.classList.remove('hidden');
+                    hasErrors = true;
+                }
+
+                if (isPasswordEmpty) {
+                    passwordInput.classList.add('input-error');
+                    passwordError.classList.remove('hidden');
+                    hasErrors = true;
+                }
+
+                if (hasErrors) return;
+
+                loginBtn.textContent = "Iniciando sesión...";
+                loginBtn.disabled = true;
+
+                // --- NUEVA LÓGICA DE NODE.JS ---
+                try {
+                    const response = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email: emailInput.value.trim(),
+                            pass: passwordInput.value.trim() // 'pass' para que coincida con tu backend
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.status === 'success') {
+                        // Credenciales correctas, vamos a la pantalla de inicio
+                        window.location.href = result.redirect; 
+                    } else {
+                        // Mostrar error (correo/contraseña incorrectos)
+                        statusMessage.textContent = result.message;
+                        statusMessage.classList.remove('hidden');
+                        statusMessage.classList.add('bg-red-50', 'text-red-600', 'border', 'border-red-200');
+                    }
+                } catch (error) {
+                    console.error("Error conectando al servidor:", error);
+                    statusMessage.textContent = "Error conectando al servidor.";
+                    statusMessage.classList.remove('hidden');
+                    statusMessage.classList.add('bg-red-50', 'text-red-600', 'border', 'border-red-200');
+                } finally {
+                    loginBtn.textContent = "Ingresar";
+                    loginBtn.disabled = false;
+                }
+            });
+
+            emailInput.addEventListener('input', () => {
+                emailInput.classList.remove('input-error');
+                emailError.classList.add('hidden');
+            });
+
+            passwordInput.addEventListener('input', () => {
+                passwordInput.classList.remove('input-error');
+                passwordError.classList.add('hidden');
+            });
+        });
+    </script>
+</body>
+</html>

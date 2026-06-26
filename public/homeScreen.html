@@ -1,0 +1,98 @@
+
+<!DOCTYPE html>
+<html lang="es">
+
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .primary-bg { background-color: #104385; }
+        .primary-text { color: #104385; }
+        .secondary-text { color: #0CDBEB; }
+        .secondary-border { border-color: #0CDBEB; }
+        .transition-all { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <nav class="primary-bg text-white shadow-lg">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 secondary-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span  id="usuarioLogueado" class="font-medium text-lg">¡Hola!</span>
+                </div>
+                
+                <div class="flex items-center">
+<a href="/logout" class="flex items-center space-x-1 hover:secondary-text transition-all font-semibold bg-white/10 px-4 py-2 rounded-lg">                        <span>Cerrar sesión</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-4xl mx-auto w-full p-6 space-y-8">
+        
+        <div class="flex flex-col items-center">
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">Equipo Afines</h2>
+            <div class="w-full max-w-sm aspect-[3/4] bg-white rounded-3xl shadow-md overflow-hidden border border-slate-100">
+                <img 
+                    src="/images/fotoAfines.jpeg" 
+                    alt="Equipo Afines" 
+                    class="w-full h-full object-cover"
+                >
+            </div>
+        </div>
+
+        <section class="bg-white p-8 rounded-2xl shadow-sm border-l-8 secondary-border border border-slate-100">
+            <div class="flex items-center space-x-3 mb-4">
+                <h2 class="text-2xl font-bold text-slate-800">Chisme criptográfico</h2>
+            </div>
+            
+            <div class="prose prose-slate max-w-none">
+                <p class="text-slate-600 leading-relaxed italic text-lg">
+                    "¿Sabías que el algoritmo RSA fue inventado 4 años antes de su 'descubrimiento' oficial, pero se mantuvo como un secreto de estado?"
+                </p>
+                <p class="mt-4 text-slate-600">
+                    Oficialmente, el algoritmo de clave pública <strong>RSA</strong> fue presentado en 1977 por Ron Rivest, Adi Shamir y Leonard Adleman (de ahí sus iniciales). Sin embargo, en 1997 se desclasificaron documentos que revelaron una verdad impactante.
+                </p>
+                <p class="mt-2 text-slate-600">
+                    Un matemático británico llamado <strong>Clifford Cocks</strong>, trabajando para el GCHQ (el servicio de inteligencia del Reino Unido), había desarrollado un modelo matemático idéntico en 1973. Sus superiores consideraron que el descubrimiento era tan poderoso que lo clasificaron como "Top Secret". Cocks no pudo decirle a nadie que había revolucionado la seguridad mundial hasta 27 años después.
+                </p>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="py-6 text-center text-slate-400 text-sm">
+        <p>&copy; 2024 Equipo Afines.</p>
+    </footer>
+
+</body>
+</html>
+
+<script>
+    fetch('/api/usuario-actual')
+        .then(res => res.json())
+        .then(data => {
+            if(data.nombre) {
+                document.getElementById('usuarioLogueado').textContent = `¡Hola, ${data.nombre}!`;
+            }
+        })
+        .catch(() => window.location.href = 'index.html'); 
+</script>
