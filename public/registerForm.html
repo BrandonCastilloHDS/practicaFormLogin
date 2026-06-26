@@ -186,16 +186,16 @@
                     const response = await fetch('/api/verificar-registro', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ codigoIngresado: verificationCodeInput.value })
+                        body: JSON.stringify({ 
+                            codigoIngresado: verificationCodeInput.value })
                     });
 
                     const result = await response.json();
 
                     if (result.status === 'success') {
-                        // ¡Éxito! Redirigimos a la pantalla de inicio
                         window.location.href = result.redirect;
                     } else {
-                        alert("Código incorrecto. Intenta de nuevo.");
+                        alert("Atención: " + result.message); 
                         verifyCodeBtn.textContent = 'Verificar código';
                         verifyCodeBtn.disabled = false;
                     }
