@@ -1,36 +1,21 @@
 require('dotenv').config();
 
-
 const bcrypt = require('bcrypt');
 const saltRounds = 10; 
-
 
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
 const cors = require('cors');
 const mysql = require('mysql2');
-const nodemailer = require('nodemailer');
 
 const app = express();
-
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Sesiones seguras
-app.use(session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false }
-}));
-
-app.use(express.static(path.join(__dirname, 'public')));
-
-se: 'sistema_login'
-// });
+// Configuración de base de datos
 const db = mysql.createConnection({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
@@ -44,54 +29,85 @@ db.connect((err) => {
     else console.log('✅ Base de datos conectada.');
 });
 
-
-
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+// Configuración de sesiones
+app.use(session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true 
     }
-});
+}));
 
+app.use(express.static(path.join(__dirname, 'public')));
 
+// --- NUEVA FUNCIÓN DE ENVÍO CON BREVO (API HTTP) ---
+const enviarCorreo = async (email, asunto, htmlContent) => {
+    try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': process.env.BREVO_API_KEY,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+                sender: {
+                    name: 'Equipo Afines',
+                    // 👇 AQUÍ DEBES PONER EL CORREO CON EL QUE TE REGISTRES EN BREVO
+                    email: 'castillomayabrandon@gmail.com' 
+                },
+                to: [
+                    { email: email } // Aquí va el correo del usuario que se está registrando
+                ],
+                subject: asunto,
+                htmlContent: htmlContent,
+            }),
+        });
 
-//  RUTAS DE REGISTRO 
+        if (response.ok) {
+            console.log(`✅ Correo enviado con éxito a ${email} a través de Brevo`);
+            return true;
+        } else {
+            const data = await response.json();
+            console.error('❌ Error de Brevo:', data);
+            throw new Error('Fallo en la API de Brevo');
+        }
+    } catch (error) {
+        console.error('❌ Error en la petición fetch:', error);
+        throw error;
+    }
+};
 
-// Recibir datos y enviar código
+// --- RUTAS DE REGISTRO ---
+
 app.post('/api/solicitar-registro', async (req, res) => {
     const { nombre, email, password } = req.body;
     const codigo = Math.floor(100000 + Math.random() * 900000);
 
-    // Guardar temporalmente
     req.session.registro_temporal = { nombre, email, password, codigo };
     console.log(`📩 Código de registro generado para ${email}: ${codigo}`);
 
+    const htmlCorreo = `
+        <div style="font-family: sans-serif; max-width: 500px; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
+            <h2 style="color: #104385;">¡Hola, ${nombre}!</h2>
+            <p>Usa el siguiente código para verificar tu cuenta:</p>
+            <div style="background-color: #f8fafc; text-align: center; padding: 15px; font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #0CDBEB; border-radius: 8px;">
+                ${codigo}
+            </div>
+        </div>
+    `;
+
     try {
-        await transporter.sendMail({
-            from: '"Equipo Afines" <castillomayabrandon@gmail.com>',
-            to: email,
-            subject: 'Código de verificación de registro',
-            html: `
-                <div style="font-family: sans-serif; max-width: 500px; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
-                    <h2 style="color: #104385;">¡Hola, ${nombre}!</h2>
-                    <p>Usa el siguiente código para verificar tu cuenta:</p>
-                    <div style="background-color: #f8fafc; text-align: center; padding: 15px; font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #0CDBEB; border-radius: 8px;">
-                        ${codigo}
-                    </div>
-                </div>
-            `
-        });
+        // Aquí llamamos a la nueva función en lugar de Nodemailer
+        await enviarCorreo(email, 'Código de verificación de registro', htmlCorreo);
         res.json({ status: 'success' });
     } catch (error) {
-        console.error("❌ Error enviando correo:", error);
         res.status(500).json({ status: 'error', message: 'Fallo al enviar el código.' });
     }
 });
 
-// Paso 2: Verificar e insertar en MySQL
 app.post('/api/verificar-registro', async (req, res) => {
     const { codigoIngresado } = req.body;
     const datosTemporales = req.session.registro_temporal;
@@ -101,68 +117,69 @@ app.post('/api/verificar-registro', async (req, res) => {
     }
 
     if (parseInt(codigoIngresado) === datosTemporales.codigo) {
-        const hashedPassword = await bcrypt.hash(datosTemporales.password, saltRounds);
-        const query = 'INSERT INTO usuarios (nombre, email, pass) VALUES (?, ?, ?)';
-        const valores = [datosTemporales.nombre, datosTemporales.email, hashedPassword];
+        try {
+            const hashedPassword = await bcrypt.hash(datosTemporales.password, saltRounds);
+            const query = 'INSERT INTO usuarios (nombre, email, pass) VALUES (?, ?, ?)';
+            const valores = [datosTemporales.nombre, datosTemporales.email, hashedPassword];
 
-        db.query(query, valores, (err, result) => {
-            if (err) {
-                console.error("❌ Error MySQL:", err);
-                return res.status(500).json({ status: 'error', message: 'Error de base de datos.' });
-            }
+            db.query(query, valores, (err, result) => {
+                if (err) {
+                    console.error("❌ Error MySQL:", err);
+                    return res.status(500).json({ status: 'error', message: 'Error de base de datos o correo ya registrado.' });
+                }
 
-            req.session.usuario_id = result.insertId;
-            req.session.registro_temporal = null; // Limpiar memoria
-            
-            console.log(`✅ Nuevo usuario registrado: ${datosTemporales.email}`);
-            res.json({ status: 'success', redirect: '/homeScreen.html' });
-        });
+                req.session.usuario_id = result.insertId;
+                req.session.registro_temporal = null; 
+                
+                console.log(`✅ Nuevo usuario registrado: ${datosTemporales.email}`);
+                res.json({ status: 'success', redirect: '/homeScreen.html' });
+            });
+        } catch (hashError) {
+            res.status(500).json({ status: 'error', message: 'Error interno del servidor.' });
+        }
     } else {
         res.status(400).json({ status: 'error', message: 'Código incorrecto.' });
     }
 });
 
-
-// login
+// --- LOGIN ---
 app.post('/api/login', (req, res) => {
     const { email, pass } = req.body; 
-    const query = 'SELECT id, nombre, pass FROM usuarios WHERE email = ?'; // Traemos el hash de la BD
+    const query = 'SELECT id, nombre, pass FROM usuarios WHERE email = ?';
 
     db.query(query, [email], async (err, results) => {
         if (err || results.length === 0) return res.status(401).json({ status: 'error', message: 'Credenciales incorrectas' });
 
         const user = results[0];
-        // Comparamos el password del form contra el hash guardado
-        const match = await bcrypt.compare(pass, user.pass);
-
-        if (match) {
-            req.session.usuario_id = user.id;
-            res.json({ status: 'success', redirect: '/homeScreen.html' });
-        } else {
-            res.status(401).json({ status: 'error', message: 'Credenciales incorrectas' });
+        try {
+            const match = await bcrypt.compare(pass, user.pass);
+            if (match) {
+                req.session.usuario_id = user.id;
+                res.json({ status: 'success', redirect: '/homeScreen.html' });
+            } else {
+                res.status(401).json({ status: 'error', message: 'Credenciales incorrectas' });
+            }
+        } catch (error) {
+            res.status(500).json({ status: 'error', message: 'Error en la autenticación.' });
         }
     });
 });
 
-
-// cerrar sesioń
+// --- LOGOUT ---
 app.get('/logout', (req, res) => {
-    req.session.destroy(() => {
+    req.session.destroy((err) => {
+        if (err) console.error("Error destruyendo sesión:", err);
         res.redirect('/index.html');
     });
 });
-// recuperar contra
 
-// Paso 1: Verificar que el correo exista y enviar código
+// --- RECUPERACIÓN DE CONTRASEÑA ---
 app.post('/api/solicitar-recuperacion', (req, res) => {
     const { email } = req.body;
-
-    // Buscamos si el usuario existe en la base de datos
     const query = 'SELECT nombre FROM usuarios WHERE email = ?';
     
     db.query(query, [email], async (err, results) => {
         if (err) {
-            
             return res.status(500).json({ status: 'error', message: 'Error de servidor' });
         }
 
@@ -173,35 +190,29 @@ app.post('/api/solicitar-recuperacion', (req, res) => {
         const nombre = results[0].nombre;
         const codigo = Math.floor(100000 + Math.random() * 900000);
 
-        // Guardamos en sesión
         req.session.recuperacion = { email, codigo, verificado: false };
         console.log(`📩 Código de recuperación generado para ${email}: ${codigo}`);
 
+        const htmlCorreo = `
+            <div style="font-family: sans-serif; max-width: 500px; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
+                <h2 style="color: #104385;">Hola, ${nombre}</h2>
+                <p>Usa este código para restablecer tu contraseña:</p>
+                <div style="background-color: #f8fafc; text-align: center; padding: 15px; font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #0CDBEB; border-radius: 8px;">
+                    ${codigo}
+                </div>
+            </div>
+        `;
+
         try {
-            await transporter.sendMail({
-                from: '"Equipo Afines" <castillomayabrandon@gmail.com>',
-                to: email,
-                subject: 'Recuperación de contraseña',
-                html: `
-                    <div style="font-family: sans-serif; max-width: 500px; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
-                        <h2 style="color: #104385;">Hola, ${nombre}</h2>
-                        <p>Alguien ha solicitado restablecer tu contraseña. Usa este código para confirmar que eres tú:</p>
-                        <div style="background-color: #f8fafc; text-align: center; padding: 15px; font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #0CDBEB; border-radius: 8px;">
-                            ${codigo}
-                        </div>
-                        <p style="font-size: 12px; color: #64748b; margin-top: 20px;">Si no fuiste tú, ignora este mensaje.</p>
-                    </div>
-                `
-            });
+            // Aquí también usamos la nueva función
+            await enviarCorreo(email, 'Recuperación de contraseña', htmlCorreo);
             res.json({ status: 'success' });
         } catch (error) {
-            console.error("Error enviando correo:", error);
             res.status(500).json({ status: 'error', message: 'Fallo al enviar el código.' });
         }
     });
 });
 
-// Paso 2: Verificar que el código ingresado sea correcto
 app.post('/api/verificar-recuperacion', (req, res) => {
     const { codigoIngresado } = req.body;
     const datos = req.session.recuperacion;
@@ -211,7 +222,6 @@ app.post('/api/verificar-recuperacion', (req, res) => {
     }
 
     if (parseInt(codigoIngresado) === datos.codigo) {
-        // Marcamos la sesión como verificada para darle permiso de cambiar la contraseña en el siguiente paso
         req.session.recuperacion.verificado = true;
         res.json({ status: 'success' });
     } else {
@@ -219,7 +229,6 @@ app.post('/api/verificar-recuperacion', (req, res) => {
     }
 });
 
-//actualizar contra
 app.post('/api/cambiar-password', async (req, res) => {
     const { nuevaPassword } = req.body;
     const datos = req.session.recuperacion;
@@ -227,20 +236,24 @@ app.post('/api/cambiar-password', async (req, res) => {
     if (!datos || !datos.verificado) {
         return res.status(403).json({ status: 'error', message: 'No estás autorizado para hacer esto.' });
     }
-    const hashedPassword = await bcrypt.hash(nuevaPassword, 10);
 
-    const query = 'UPDATE usuarios SET pass = ? WHERE email = ?';
-    
-    db.query(query, [hashedPassword, datos.email], (err) => {
-        if (err) {
-            console.error("Error al actualizar contraseña:", err);
-            return res.status(500).json({ status: 'error', message: 'Error de base de datos.' });
-        }
+    try {
+        const hashedPassword = await bcrypt.hash(nuevaPassword, saltRounds);
+        const query = 'UPDATE usuarios SET pass = ? WHERE email = ?';
+        
+        db.query(query, [hashedPassword, datos.email], (err) => {
+            if (err) {
+                console.error("Error al actualizar contraseña:", err);
+                return res.status(500).json({ status: 'error', message: 'Error de base de datos.' });
+            }
 
-        console.log(`✅ Contraseña actualizada para: ${datos.email}`);
-        req.session.recuperacion = null; // Limpiamos la sesión por seguridad
-        res.json({ status: 'success' });
-    });
+            console.log(`✅ Contraseña actualizada para: ${datos.email}`);
+            req.session.recuperacion = null; 
+            res.json({ status: 'success' });
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: 'Error al procesar la contraseña.' });
+    }
 });
 
 app.get('/api/usuario-actual', (req, res) => {
@@ -256,7 +269,6 @@ app.get('/api/usuario-actual', (req, res) => {
         res.status(401).json({ error: 'No logueado' });
     }
 });
-
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
