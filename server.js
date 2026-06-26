@@ -35,8 +35,10 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: { 
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true 
+        secure: false,
+        httpOnly: true,
+        maxAge: 1000 * 60 * 15
+
     }
 }));
 
@@ -55,7 +57,6 @@ const enviarCorreo = async (email, asunto, htmlContent) => {
             body: JSON.stringify({
                 sender: {
                     name: 'Equipo Afines',
-                    // 👇 AQUÍ DEBES PONER EL CORREO CON EL QUE TE REGISTRES EN BREVO
                     email: 'castillomayabrandon@gmail.com' 
                 },
                 to: [
